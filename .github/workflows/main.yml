@@ -1,4 +1,4 @@
-name: Video + Audio Stream (Loop & Auto-Restart)
+name: 24/7 Unlimited Live Stream (Public Repo)
 
 on:
   workflow_dispatch:
@@ -8,7 +8,8 @@ on:
 jobs:
   stream:
     runs-on: ubuntu-latest
-    timeout-minutes: 358 
+    # Public repo mein time limit ki chinta nahi hai, par auto-restart ke liye timeout zaroori hai
+    timeout-minutes: 355 
 
     steps:
       - name: Checkout Code
@@ -19,35 +20,38 @@ jobs:
           sudo apt update
           sudo apt install -y ffmpeg
 
+      - name: Check Media Files
+        run: |
+          if [ ! -f "video.mp4" ]; then echo "video.mp4 missing!" && exit 1; fi
+          if [ ! -f "audio.mp3" ]; then echo "audio.mp3 missing!" && exit 1; fi
+
       - name: Start Live Stream
         env:
-          STREAM_URL: "rtmp://a.rtmp.youtube.com/live2/k4bv-wakv-50ad-uas6-8rtr"
+          # Secrets ka istemal (Yahan se key leak nahi hogi)
+          STREAM_URL: ${{ secrets.STREAM_URL }}
           GH_TOKEN: ${{ secrets.GH_PAT }}
         run: |
-          echo "Streaming starting with Copyright Protection (Pitch & Speed Filter)..."
+          echo "Unlimited stream starting for 5 hours and 50 minutes..."
           
-          # FFmpeg command with Audio Pitch/Speed filters for copyright protection
           ffmpeg -re \
             -stream_loop -1 -i video.mp4 \
             -stream_loop -1 -i audio.mp3 \
-            -filter_complex "[1:a]atempo=1.02,asetrate=44100*1.02,aresample=44100[aout]" \
-            -map 0:v:0 -map "[aout]" \
+            -map 0:v:0 -map 1:a:0 \
             -c:v libx264 \
-            -preset veryfast \
+            -preset ultrafast \
             -pix_fmt yuv420p \
             -g 50 \
-            -b:v 2000k \
+            -b:v 2500k \
             -c:a aac \
             -b:a 128k \
             -t 05:50:00 \
             -f flv \
             "$STREAM_URL"
 
-          echo "FFmpeg finished. Triggering next workflow..."
+          echo "Stream duration finished. Re-triggering workflow..."
           
           curl -X POST \
             -H "Authorization: token $GH_TOKEN" \
             -H "Accept: application/vnd.github.v3+json" \
             https://api.github.com/repos/${{ github.repository }}/dispatches \
             -d '{"event_type": "restart_stream"}'
-            
