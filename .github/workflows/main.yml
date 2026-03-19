@@ -21,8 +21,8 @@ jobs:
 
       - name: Check Media Files
         run: |
-          if [ ! -f "video5.mp4" ] || [ ! -f "audio5.mp3" ]; then 
-            echo "Error: video5.mp4 or audio5.mp3 missing!" 
+          if [ ! -f "video.mp4" ] || [ ! -f "audio.mp3" ]; then 
+            echo "Error: video.mp4 or audio.mp3 missing!" 
             exit 1
           fi
 
