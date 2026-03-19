@@ -1,4 +1,4 @@
-name: 24/7 Unlimited Live Stream (Public Repo)
+name: 24/7 Dual-Stream (Fixed & Optimized)
 
 on:
   workflow_dispatch:
@@ -8,7 +8,6 @@ on:
 jobs:
   stream:
     runs-on: ubuntu-latest
-    # Public repo mein time limit ki chinta nahi hai, par auto-restart ke liye timeout zaroori hai
     timeout-minutes: 355 
 
     steps:
@@ -22,36 +21,34 @@ jobs:
 
       - name: Check Media Files
         run: |
-          if [ ! -f "video.mp4" ]; then echo "video.mp4 missing!" && exit 1; fi
-          if [ ! -f "audio.mp3" ]; then echo "audio.mp3 missing!" && exit 1; fi
+          if [ ! -f "video5.mp4" ] || [ ! -f "audio5.mp3" ]; then 
+            echo "Error: video5.mp4 or audio5.mp3 missing!" 
+            exit 1
+          fi
 
-      - name: Start Live Stream
+      - name: Start 2 Live Streams
         env:
-          # Secrets ka istemal (Yahan se key leak nahi hogi)
-          STREAM_URL: ${{ secrets.STREAM_URL }}
+          # Pehle secret ka naam aapki request ke mutabik STREAM_URL rakha hai
+          S1: ${{ secrets.STREAM_URL }}
+          S2: ${{ secrets.STREAM_2_URL }}
           GH_TOKEN: ${{ secrets.GH_PAT }}
         run: |
-          echo "Unlimited stream starting for 5 hours and 50 minutes..."
-          
-          ffmpeg -re \
-            -stream_loop -1 -i video.mp4 \
-            -stream_loop -1 -i audio.mp3 \
-            -map 0:v:0 -map 1:a:0 \
-            -c:v libx264 \
-            -preset ultrafast \
-            -pix_fmt yuv420p \
-            -g 50 \
-            -b:v 2500k \
-            -c:a aac \
-            -b:a 128k \
-            -t 05:50:00 \
-            -f flv \
-            "$STREAM_URL"
+          echo "Starting 2 parallel streams for 5 hours 40 minutes..."
 
-          echo "Stream duration finished. Re-triggering workflow..."
-          
-          curl -X POST \
-            -H "Authorization: token $GH_TOKEN" \
-            -H "Accept: application/vnd.github.v3+json" \
-            https://api.github.com/repos/${{ github.repository }}/dispatches \
-            -d '{"event_type": "restart_stream"}'
+          # Optimized settings taaki load na pade
+          FF_COMMON="-re -stream_loop -1 -i video5.mp4 -stream_loop -1 -i audio5.mp3 \
+          -map 0:v:0 -map 1:a:0 -c:v libx264 -preset ultrafast -tune zerolatency \
+          -pix_fmt yuv420p -b:v 1500k -c:a aac -b:a 128k -t 05:40:00 -f flv"
+
+          # Dono streams ko background me start kar rahe hain
+          ffmpeg $FF_COMMON "$S1" &
+          ffmpeg $FF_COMMON "$S2" &
+
+          # Wait command dono processes ke khatam hone ka intezar karega
+          wait
+
+          echo "Streams finished. Re-triggering..."
+          curl -X POST -H "Authorization: token $GH_TOKEN" \
+          -H "Accept: application/vnd.github.v3+json" \
+          https://api.github.com/repos/${{ github.repository }}/dispatches \
+          -d '{"event_type": "restart_stream"}'
