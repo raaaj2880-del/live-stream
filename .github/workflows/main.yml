@@ -1,9 +1,13 @@
-name: 24/7 Dual-Stream (Fixed & Optimized)
+name: 24/7 Dual-Stream (Fixed Names)
 
 on:
   workflow_dispatch:
   repository_dispatch:
     types: [restart_stream]
+
+env:
+  # Node.js ki warning hatane ke liye
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   stream:
@@ -21,33 +25,35 @@ jobs:
 
       - name: Check Media Files
         run: |
+          # File names strictly changed to video.mp4 and audio.mp3
           if [ ! -f "video.mp4" ] || [ ! -f "audio.mp3" ]; then 
-            echo "Error: video.mp4 or audio.mp3 missing!" 
+            echo "Error: video.mp4 or audio.mp3 not found in repository!" 
             exit 1
           fi
 
       - name: Start 2 Live Streams
         env:
-          # Pehle secret ka naam aapki request ke mutabik STREAM_URL rakha hai
-          S1: ${{ secrets.STREAM_URL }}
-          S2: ${{ secrets.STREAM_2_URL }}
+          STREAM_URL: ${{ secrets.STREAM_URL }}
+          STREAM_2_URL: ${{ secrets.STREAM_2_URL }}
           GH_TOKEN: ${{ secrets.GH_PAT }}
         run: |
-          echo "Starting 2 parallel streams for 5 hours 40 minutes..."
+          echo "Starting streams with video.mp4 and audio.mp3..."
 
-          # Optimized settings taaki load na pade
-          FF_COMMON="-re -stream_loop -1 -i video5.mp4 -stream_loop -1 -i audio5.mp3 \
+          # Stable settings for 24/7 stream
+          FF_COMMON="-re -stream_loop -1 -i video.mp4 -stream_loop -1 -i audio.mp3 \
           -map 0:v:0 -map 1:a:0 -c:v libx264 -preset ultrafast -tune zerolatency \
-          -pix_fmt yuv420p -b:v 1500k -c:a aac -b:a 128k -t 05:40:00 -f flv"
+          -pix_fmt yuv420p -b:v 2000k -c:a aac -b:a 128k -t 05:45:00 -f flv"
 
-          # Dono streams ko background me start kar rahe hain
-          ffmpeg $FF_COMMON "$S1" &
-          ffmpeg $FF_COMMON "$S2" &
+          # Pehli stream (STREAM_URL)
+          ffmpeg $FF_COMMON "$STREAM_URL" &
+          
+          # Doosri stream (STREAM_2_URL)
+          ffmpeg $FF_COMMON "$STREAM_2_URL" &
 
-          # Wait command dono processes ke khatam hone ka intezar karega
+          # Wait taaki dono background process chalti rahein
           wait
 
-          echo "Streams finished. Re-triggering..."
+          echo "Duration complete. Re-triggering..."
           curl -X POST -H "Authorization: token $GH_TOKEN" \
           -H "Accept: application/vnd.github.v3+json" \
           https://api.github.com/repos/${{ github.repository }}/dispatches \
